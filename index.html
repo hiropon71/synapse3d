@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Synapse 3D v0.7.0 α</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #1a1a1a; font-family: 'Segoe UI', sans-serif; }
+        canvas { display: block; }
+
+        #ui-overlay {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: #00ffcc;
+            pointer-events: none;
+            text-shadow: 0 0 10px rgba(0,255,204,0.5);
+        }
+
+        /* ---- 折り畳みパネル共通 ---- */
+        .collapsible-panel {
+            position: absolute;
+            background: rgba(15, 15, 15, 0.88);
+            border: 1px solid #00ffcc;
+            border-radius: 14px;
+            box-shadow: 0 0 18px rgba(0,255,204,0.18);
+            font-size: 11px;
+            color: #e0e0e0;
+            overflow: hidden;
+            transition: max-height 0.25s ease, opacity 0.2s ease;
+        }
+
+        .panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 7px 12px;
+            cursor: pointer;
+            user-select: none;
+            color: #00ffcc;
+            font-weight: bold;
+            font-size: 11px;
+            letter-spacing: 1px;
+        }
+        .panel-header:hover { background: rgba(0,255,204,0.08); }
+
+        .toggle-btn {
+            background: none;
+            border: none;
+            color: #00ffcc;
+            font-size: 13px;
+            cursor: pointer;
+            padding: 0 2px;
+            line-height: 1;
+            transition: transform 0.2s;
+        }
+        .toggle-btn.collapsed { transform: rotate(-90deg); }
+
+        .panel-body {
+            padding: 10px 14px 12px;
+            transition: max-height 0.25s ease, opacity 0.2s ease, padding 0.2s;
+            max-height: 400px;
+            opacity: 1;
+            overflow: hidden;
+        }
+        .panel-body.collapsed {
+            max-height: 0;
+            opacity: 0;
+            padding-top: 0;
+            padding-bottom: 0;
+        }
+
+        /* ---- 凡例パネル（左下） ---- */
+        #footer-ui {
+            left: 20px;
+            bottom: 20px;
+            max-width: 420px;
+        }
+
+        /* ---- キーボードショートカット ---- */
+        kbd {
+            background: #333;
+            border-radius: 4px;
+            padding: 2px 6px;
+            color: #00ffcc;
+            border: 1px solid #555;
+        }
+        .highlight { color: #00ffcc; font-weight: bold; }
+        .done { color: #888; text-decoration: line-through; }
+        .current { color: #ffcc00; font-weight: bold; border-bottom: 1px solid #ffcc00; }
+
+        .roadmap {
+            margin-top: 8px;
+            padding-top: 7px;
+            border-top: 1px dashed #444;
+            font-size: 10px;
+        }
+
+        .lang-en, .lang-ja { display: none; }
+    </style>
+</head>
+<body>
+    <div id="ui-overlay">
+        <h1 style="margin:0;">Synapse 3D <small>v0.7.0 α</small></h1>
+        <p style="margin:2px 0; font-size: 10px; letter-spacing: 3px;">AI POSE PIPELINE PROJECT</p>
+    </div>
+
+    <!-- 凡例パネル（左下・折り畳み） -->
+    <div id="footer-ui" class="collapsible-panel">
+        <div class="panel-header" onclick="togglePanel('footer-body', 'footer-toggle')">
+            <span>📖 操作ガイド</span>
+            <button class="toggle-btn" id="footer-toggle">▼</button>
+        </div>
+        <div class="panel-body collapsed" id="footer-body">
+            <div id="nav-info">
+                <span class="lang-ja"><span class="highlight">操作:</span> 左ドラッグ 回転 / <kbd>Ctrl</kbd>+ドラッグ 移動 / スクロール 拡大縮小</span>
+                <span class="lang-en"><span class="highlight">Nav:</span> Left-Drag Orbit / <kbd>Ctrl</kbd>+Drag Pan / Scroll Zoom</span>
+            </div>
+            <div id="action-info" style="margin-top:8px;">
+                <span class="lang-ja">
+                    <kbd>R</kbd> X回転 / <kbd>E</kbd> Y回転 / <kbd>Shift</kbd>+逆回転<br>
+                    <kbd>Del</kbd> 削除 / <kbd>Ctrl+Z</kbd> UNDO / <kbd>ESC</kbd> 面選択解除<br>
+                    <kbd>S</kbd> JSON保存 / <kbd>P</kbd> <span class="highlight">PNG保存</span>
+                </span>
+                <span class="lang-en">
+                    <kbd>R</kbd> X-Rot / <kbd>E</kbd> Y-Rot / <kbd>Shift</kbd>+Inverse<br>
+                    <kbd>Del</kbd> Delete / <kbd>Ctrl+Z</kbd> Undo / <kbd>ESC</kbd> Cancel Face<br>
+                    <kbd>S</kbd> Save JSON / <kbd>P</kbd> <span class="highlight">Save PNG</span>
+                </span>
+            </div>
+            <div class="roadmap">
+                <span class="highlight">ROADMAP:</span><br>
+                <span class="done">1. <span class="lang-ja">最小4ボーン構造</span><span class="lang-en">4-Bone Rig</span></span>
+                / <span class="current">2. <span class="lang-ja">PNG出力実装</span><span class="lang-en">PNG Export</span></span>
+                / 3. <span class="lang-ja">OpenPose 18点出力</span><span class="lang-en">OpenPose 18pt</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const lang = navigator.language.startsWith('ja') ? 'ja' : 'en';
+        document.querySelectorAll('.lang-' + lang).forEach(el => el.style.display = 'inline');
+
+        function togglePanel(bodyId, btnId) {
+            const body = document.getElementById(bodyId);
+            const btn  = document.getElementById(btnId);
+            const isCollapsed = body.classList.contains('collapsed');
+            body.classList.toggle('collapsed', !isCollapsed);
+            btn.classList.toggle('collapsed', !isCollapsed);
+            btn.textContent = isCollapsed ? '▼' : '▶';
+        }
+    </script>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+    <script type="module" src="./src/main.js"></script>
+</body>
+</html>
