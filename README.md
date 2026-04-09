@@ -12,3 +12,7 @@ https://kyoto-hirota.jp/synapse3d/
 - STL export
 - JSON save/load
 - History system with undo
+
+## Latest Update
+**2026-04-09**  
+v0.7.1 alpha: fixed mannequin neck selection, refined face docking, and improved POS panel layout
